@@ -25,3 +25,35 @@ def save_xml(filepath, tags, values):
 def load_checkerboard_xml(filepath):
     tags = ['CheckerBoardWidth', 'CheckerBoardHeight', 'CheckerBoardSquareSize']
     return load_xml(filepath, tags)
+
+def get_video_frame(filepath, frame_index):
+    """
+    This function returns the frame at the specified index for the video located at filepath
+    :param filepath: The video path
+    :param frame_index: The frame index
+    :return: The requested frame
+    """
+    video = cv2.VideoCapture(filepath)
+    while True:
+        success, current_frame = video.read()
+        if not success:
+            break
+        elif frame_index == 0:
+            return current_frame
+        frame_index -= 1
+    return None
+
+def count_video_frames(filepath):
+    """
+    This function counts the number of frames in the video located at filepath
+    :param filepath: The video path
+    :return: The number of frames
+    """
+    frame_count = 0
+    video = cv2.VideoCapture(filepath)
+    while True:
+        success, _ = video.read()
+        if not success:
+            break
+        frame_count += 1
+    return frame_count

@@ -3,7 +3,10 @@ import numpy as np
 import os
 import glob
 import copy
-from modules.io import load_checkerboard_xml, save_xml, find_file_paths
+from modules.io import load_checkerboard_xml, save_xml, find_file_paths, get_video_frame
+from modules.subtraction import train_KNN_background_subtractor
+from modules.utils import find_checkerboard_polygon, interpolate_and_project_corners
+
 
 # Global variables
 checkerboard_corners = set()
@@ -63,7 +66,114 @@ def log_camera_intrinsics_confidence(mtx, ret, std, calibration_name="", roundin
     print("Camera Center (Cy)", round(mtx[1][2], rounding), "\tSTD +/-", round(std[3][0], rounding), "\n")
 
 
+def corners_selection_callback(event, x, y, flags, params):
+    global checkerboard_corners, current_image
 
+    # Local UI update flag
+    update = False
+
+    if event == cv2.EVENT_LBUTTONDOWN and len(checkerboard_corners) < 4:
+        checkerboard_corners.add((x, y))
+        update = True
+    elif event == cv2.EVENT_RBUTTONDOWN and len(checkerboard_corners) > 0:
+        nearest_point = min(checkerboard_corners,
+                            key=lambda p: np.linalg.norm(np.array([x, y]) - np.array([p[0], p[1]])))
+        checkerboard_corners.remove(nearest_point)
+        update = True
+
+    if update:
+        show_image = copy.deepcopy(current_image)
+        for point in checkerboard_corners:
+            cv2.circle(show_image, point, 2, (255, 0, 0), -1)
+        cv2.imshow("Corner selection phase", show_image)
+
+
+def corners_sorting_callback(event, x, y, flags, params):
+    global checkerboard_corners, checkerboard_corners_sorted, current_image
+
+    # Local UI update flag
+    update = False
+
+    if event == cv2.EVENT_RBUTTONDOWN and len(checkerboard_corners_sorted) > 0:
+        nearest_point = min(checkerboard_corners_sorted,
+                            key=lambda p: np.linalg.norm(np.array([x, y]) - np.array([p[0], p[1]])))
+        checkerboard_corners_sorted.pop(checkerboard_corners_sorted.index(nearest_point))
+        update = True
+    elif event == cv2.EVENT_LBUTTONDOWN and len(checkerboard_corners_sorted) < 4:
+        nearest_point = min(list(filter(lambda p: p not in checkerboard_corners_sorted, checkerboard_corners)),
+                            key=lambda p: np.linalg.norm(np.array([x, y]) - np.array([p[0], p[1]])))
+        checkerboard_corners_sorted.append(nearest_point)
+        update = True
+
+    if update:
+        show_image = copy.deepcopy(current_image)
+        for point in checkerboard_corners:
+            cv2.circle(show_image, point, 2, (255, 0, 0), -1)
+            if point in checkerboard_corners_sorted:
+                index = checkerboard_corners_sorted.index(point)
+                cv2.putText(show_image, "P" + str(index + 1), point, cv2.FONT_HERSHEY_SIMPLEX, 1,
+                            (0, 0, 255), 2,
+                            cv2.LINE_AA)
+        cv2.imshow("Corner selection phase", show_image)
+
+
+def find_checkerboard_corners(checkerboard_path, background_path, pattern_shape):
+    global checkerboard_corners, current_image
+
+    # fetch first video frame
+    first_frame = get_video_frame(checkerboard_path, 0)
+    knn_subtractor = train_KNN_background_subtractor(background_path)
+
+    # find_checkerboard_polygon with frame
+    polygon_points = find_checkerboard_polygon(first_frame, knn_subtractor)
+    checkerboard_corners = {(point[0], point[1]) for point in polygon_points}
+
+    # draw polygon points
+    current_image = copy.deepcopy(first_frame)
+    show_image = copy.deepcopy(first_frame)
+
+    for point in checkerboard_corners:
+        cv2.circle(show_image, point, 2, (255, 0, 0), -1)
+
+    cv2.imshow("Corner selection phase", show_image)
+    cv2.setWindowTitle("Corner selection phase", "Checkerboard Corners Selection")
+    cv2.setMouseCallback("Corner selection phase", corners_selection_callback)
+
+    while True:
+        cv2.waitKey(0)
+        if len(checkerboard_corners) == 4:
+            break
+
+    cv2.setWindowTitle("Corner selection phase", "Checkerboard Corners Sorting")
+    cv2.setMouseCallback("Corner selection phase", corners_sorting_callback)
+
+    while True:
+        cv2.waitKey(0)
+        if len(checkerboard_corners_sorted) == 4:
+            cv2.setMouseCallback("Corner selection phase", lambda *args: None)
+            break
+
+    # compute internal corners
+    corners = np.array([np.array([x, y]) for x, y in checkerboard_corners_sorted])
+    corners = interpolate_and_project_corners(corners, pattern_shape, True)
+    corners = np.array([[p[0] for p in corners], [p[1] for p in corners]]) \
+        .transpose().astype(np.float32)
+
+    # Show corners and return
+    cv2.drawChessboardCorners(current_image, pattern_shape, corners, True)
+
+    cv2.setWindowTitle("Corner selection phase", "Checkerboard Corners")
+    cv2.imshow("Corner selection phase", current_image)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    return np.array(corners)
+
+def compute_camera_extrinsics(corners, camera_matrix, square_size, pattern_shape):
+    default_object_points = np.zeros((pattern_shape[0] * pattern_shape[1], 3), dtype=np.float32)
+    default_object_points[:, :2] = np.mgrid[0:pattern_shape[0], 0:pattern_shape[1]].T.reshape(-1, 2) \
+                                   * square_size
+    return cv2.solvePnP(default_object_points, corners, camera_matrix, None)
 
 
 if __name__ == '__main__':
@@ -89,18 +199,6 @@ if __name__ == '__main__':
     intrinsics_files = find_file_paths('data', 'intrinsics.avi')
     print(intrinsics_files)
     
-    # Find the paths for extrinsic videos
-    extrinsics_files = find_file_paths('data', 'checkerboard.avi')
-    print(extrinsics_files)
-    
-    # Find the paths for background videos
-    background_files = find_file_paths('data', 'background.avi')
-    print(background_files)
-    
-    # Find the paths for intrinsic videos
-    reconstruction_video_files = find_file_paths('data', 'video.avi')
-    print(reconstruction_video_files)
-    
     for i, intrinsics_file in enumerate(intrinsics_files):
         print(intrinsics_file)
         # Sample the training video for the specified camera
@@ -123,8 +221,61 @@ if __name__ == '__main__':
         save_xml(intrinsics_xml_path,
                 ["CameraMatrix", "DistortionCoeffs"],
                 [matrix, dist])
+        
     
     
+    
+    print("-"*40)
+    
+    # Find the paths for extrinsic videos
+    extrinsics_files = find_file_paths('data', 'checkerboard.avi')
+    print(extrinsics_files)
+    
+    for i, extrinsics_file in enumerate(extrinsics_files):
+        print(extrinsics_file) 
+        
+        checkerboard_corners = find_checkerboard_corners(extrinsics_file,
+                                                        background_video_path,
+                                                        checkerboard_shape)
+        
+        re_err_e, r_vecs, t_vecs = compute_camera_extrinsics(checkerboard_corners,
+                                                            matrix,
+                                                            checkerboard_data["CheckerBoardSquareSize"],
+                                                            checkerboard_shape)
+        # Saving the estimated extrinsics to args.camera_path/extrinsics.xml
+        extrinsics_xml_path = os.path.join(calibrations_path, f"extrinsics_cam_{i+1}.xml")
+        save_xml(extrinsics_xml_path,
+                ["RotationVector", "TranslationVector"],
+                [r_vecs, t_vecs])
+    
+    
+    # Final calibration test
+    calibration_test_frame = get_video_frame(extrinsics_files[0], 0)
+    cv2.drawFrameAxes(calibration_test_frame, matrix, None, r_vecs, t_vecs,
+                      checkerboard_data["CheckerBoardSquareSize"] * 4, thickness=2)
+
+    # Plotting the calibration frame
+    cv2.imshow("Calibration Frame Test", calibration_test_frame)
+
+    # Saving the calibration frame to args.camera_path/calibration_test_frame.jpg
+    calibration_test_frame_path = os.path.join(calibrations_path, "calibration_test_frame.jpg")
+    cv2.imwrite(calibration_test_frame_path, calibration_test_frame)
+
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    exit(0)
+    
+    print("-"*40)
+    # Find the paths for background videos
+    background_files = find_file_paths('data', 'background.avi')
+    print(background_files)
+    
+    
+    
+    print("-"*40)
+    # Find the paths for intrinsic videos
+    reconstruction_video_files = find_file_paths('data', 'video.avi')
+    print(reconstruction_video_files)
     
     
     

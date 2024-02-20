@@ -1,5 +1,16 @@
 import cv2
+import os
 
+def find_file_paths(directory, filename):
+    found_files = []
+
+    for folder_path, subfolders, filenames in os.walk(directory):
+        for file in filenames:
+            if file == filename:
+                full_path = os.path.join(folder_path, file)
+                found_files.append(full_path)
+
+    return found_files
 
 def load_xml(filepath, tags, custom_process=lambda x: int(x.real())):
     file = cv2.FileStorage(filepath, cv2.FileStorage_READ)

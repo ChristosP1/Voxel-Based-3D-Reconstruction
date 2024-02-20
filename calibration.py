@@ -1,8 +1,9 @@
 import cv2
 import numpy as np
 import os
+import glob
 import copy
-from modules.io import load_checkerboard_xml, save_xml
+from modules.io import load_checkerboard_xml, save_xml, find_file_paths
 
 # Global variables
 checkerboard_corners = set()
@@ -11,10 +12,8 @@ current_image = None
 
 
 def sample_video_frames(video_path, checkerboard_shape, step):
-    
     video = cv2.VideoCapture(video_path)
     frame_samples = []
-
     frame_iter = 0
     
     while True:
@@ -53,14 +52,6 @@ def compute_camera_intrinsics(image_points, image_shape, checkerboard_pattern, s
 
 
 def log_camera_intrinsics_confidence(mtx, ret, std, calibration_name="", rounding=3):
-    """
-    This function logs the estimated value and standard deviation for each intrinsic camera parameter
-    :param mtx: camera matrix
-    :param ret: re-projection error
-    :param std: standard deviation for each estimated intrinsic parameter
-    :param calibration_name: calibration name
-    :param rounding: number of decimal figures considered while rounding
-    """
     title = "Confidence Of Estimated Camera Parameters" if calibration_name == "" \
         else "[" + calibration_name + "] Confidence Of Estimated Camera Parameters"
 
@@ -78,41 +69,60 @@ def log_camera_intrinsics_confidence(mtx, ret, std, calibration_name="", roundin
 if __name__ == '__main__':
     
     checkboard_xml_path = 'data/checkerboard.xml'
-    intrinsic_video_path = 'data/cam1/intrinsics.avi'
+    # intrinsic_video_path = 'data/cam1/intrinsics.avi'
     calibrations_path = 'calibrations'
     extrisic_video_path = 'data/cam1/checkerboard.avi'
     background_video_path = 'data/cam1/background.avi'
     
-    sampling_step = 60
+    sampling_step = 80
 
     # Retrieve checkerboard data
     checkerboard_data = load_checkerboard_xml(checkboard_xml_path)
 
-    # Sample the training video for the specified camera
+    # Retrieve checkerboard shape and square size
     checkerboard_shape, checkerboard_square_size = (checkerboard_data["CheckerBoardHeight"], checkerboard_data["CheckerBoardWidth"]) \
-                                                    ,checkerboard_data["CheckerBoardSquareSize"]
-                                                     
+                                                    ,checkerboard_data["CheckerBoardSquareSize"]                                       
     print("Shape of the checkerboard:", checkerboard_shape)
     
-    calibration_images_points, images_shape = sample_video_frames(intrinsic_video_path,
-                                                                        checkerboard_shape, sampling_step)
-    print("Frames used for intristics calibration:",len(calibration_images_points))
     
+    # Find the paths for intrinsic videos
+    intrinsics_files = find_file_paths('data', 'intrinsics.avi')
+    print(intrinsics_files)
     
-    # Calibrate the specified camera
-    re_err_i, matrix, dist, std_in, = compute_camera_intrinsics(calibration_images_points,
-                                                                 images_shape,
-                                                                 checkerboard_shape,
-                                                                 checkerboard_square_size)
+    # Find the paths for extrinsic videos
+    extrinsics_files = find_file_paths('data', 'checkerboard.avi')
+    print(extrinsics_files)
     
-    # Log the estimated intrinsics parameters
-    log_camera_intrinsics_confidence(matrix, re_err_i, std_in, "Camera Calibration")
+    # Find the paths for background videos
+    background_files = find_file_paths('data', 'background.avi')
+    print(background_files)
     
-    # Save the estimated intrinsics 
-    intrinsics_xml_path = os.path.join(calibrations_path, "intrinsics.xml")
-    save_xml(intrinsics_xml_path,
-             ["CameraMatrix", "DistortionCoeffs"],
-             [matrix, dist])
+    # Find the paths for intrinsic videos
+    reconstruction_video_files = find_file_paths('data', 'video.avi')
+    print(reconstruction_video_files)
+    
+    for i, intrinsics_file in enumerate(intrinsics_files):
+        print(intrinsics_file)
+        # Sample the training video for the specified camera
+        calibration_images_points, images_shape = sample_video_frames(intrinsics_file,
+                                                                            checkerboard_shape, sampling_step)
+        print("Frames used for intristics calibration:",len(calibration_images_points))
+        
+        
+        # Calibrate the specified camera
+        re_err_i, matrix, dist, std_in, = compute_camera_intrinsics(calibration_images_points,
+                                                                    images_shape,
+                                                                    checkerboard_shape,
+                                                                    checkerboard_square_size)
+        
+        # Log the estimated intrinsics parameters
+        log_camera_intrinsics_confidence(matrix, re_err_i, std_in, "Camera Calibration")
+        
+        # Save the estimated intrinsics 
+        intrinsics_xml_path = os.path.join(calibrations_path, f"intrinsics_cam_{i+1}.xml")
+        save_xml(intrinsics_xml_path,
+                ["CameraMatrix", "DistortionCoeffs"],
+                [matrix, dist])
     
     
     

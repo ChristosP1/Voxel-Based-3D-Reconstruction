@@ -2,6 +2,18 @@ import cv2
 from modules.io import count_video_frames
 
 
+def subtract_background(chessboard_image, background_image):
+    # Convert both images to grayscale
+    gray_chessboard = cv2.cvtColor(chessboard_image, cv2.COLOR_BGR2GRAY)
+    gray_background = cv2.cvtColor(background_image, cv2.COLOR_BGR2GRAY)
+
+    # Background subtraction
+    subtracted = cv2.absdiff(gray_chessboard, gray_background)
+
+    # Thresholding to enhance the chessboard
+    _, thresh = cv2.threshold(subtracted, 30, 255, cv2.THRESH_BINARY)
+    return thresh
+
 def train_KNN_background_subtractor(filepath):
     """
     This function trains a KNN background subtractor using the video located at filepath
@@ -17,27 +29,5 @@ def train_KNN_background_subtractor(filepath):
         if not success:
             break
         subtractor.apply(current_frame, None)
-
-    return subtractor
-
-
-def train_hsv_KNN_subtractor(filepath, threshold):
-    """
-        This function trains a KNN background subtractor using the hsv version of the video located at filepath
-        :param filepath: The training video path
-        :param threshold: The foreground threshold
-        :return: The trained KNN background subtractor
-    """
-    subtractor = cv2.createBackgroundSubtractorKNN(history=count_video_frames(filepath),
-                                                   detectShadows=False,
-                                                   dist2Threshold=threshold)
-    video = cv2.VideoCapture(filepath)
-
-    while True:
-        success, frame = video.read()
-        if not success:
-            break
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        subtractor.apply(hsv)
 
     return subtractor

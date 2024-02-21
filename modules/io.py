@@ -57,3 +57,17 @@ def count_video_frames(filepath):
             break
         frame_count += 1
     return frame_count
+
+def output_extracted_image_points(image_points, automatic_detections, image_shape, output_path="calibration_outputs",
+                                  output_filename="extracted_image_points.npz"):
+    """
+    Outputs image point extraction outputs to file.
+
+    :param image_points: 2D chessboard image points for every training image
+    :param automatic_detections: array of booleans of whether each training image's points were detected automatically
+    :param image_shape: shape of the images
+    :param output_path: output directory path
+    :param output_filename: output file name (including extension)
+    """
+    np.savez(os.path.join(output_path, output_filename),
+             image_points=image_points, automatic_detections=automatic_detections, image_shape=image_shape)

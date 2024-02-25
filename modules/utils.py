@@ -88,3 +88,11 @@ def interpolate_points_from_manual_corners(corners, chessboard_shape, use_perspe
 
     # Return (MxN, 1, 2) array to match automatic corner detection output
     return np.reshape(interpolated_points, (-1, 1, 2))
+
+
+def create_gaussian_model(frames):
+    # Calculate the mean and standard deviation for each pixel
+    mean = np.mean(frames, axis=0)
+    std_dev = np.std(frames, axis=0)
+
+    return mean, std_dev

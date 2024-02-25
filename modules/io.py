@@ -1,5 +1,6 @@
 import cv2
 import os
+import numpy as np
 
 def find_file_paths(directory, filename):
     found_files = []

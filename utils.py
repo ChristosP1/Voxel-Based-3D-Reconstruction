@@ -16,6 +16,8 @@ def show_warning(message_id):
     - no_automatic_corners for automatic corner detection failure
     - no_automatic_corners_online for automatic corner detection failure in online phase
     - no_automatic_corners_online_video for automatic corner detection failure in online phase during video processing
+    - approx_corners_sort for instructions to sort approximated corners
+    - approx_corners_discard for instructions for manual selection after discarding approximated corners
     - calibration_results_unequal for array length of camera calibration results being unequal
 
     :param message_id: message ID string to print appropriate message
@@ -28,11 +30,17 @@ def show_warning(message_id):
         "image_none": "Image could not be loaded and will be skipped!",
         "video_none": "Video could not be played and will be skipped!",
         "incorrect_num_corners": "Incorrect number of corners given!",
-        "no_automatic_corners": "Corners not detected automatically! Need to extract manually! " +
-                                "Select the 4 corners with left clicks and then press any key to continue. " +
+        "no_automatic_corners": "Corners not detected automatically! Need to extract manually!\n" +
+                                "Select the 4 corners with left clicks and then press any key to continue.\n" +
                                 "To undo selections in order use right clicks.",
         "no_automatic_corners_online": "Corners not detected automatically! Image will be discarded from testing!",
         "no_automatic_corners_online_video": "Corners not detected automatically for some frames! Frames were skipped",
+        "approx_corners_sort": "Corners not detected automatically! Outer corners have been approximated.\n" +
+                               "Select order of the 4 corners with left clicks and then press any key to continue.\n" +
+                               "To undo selections in order use right clicks. Closest corner to a click is selected.",
+        "approx_corners_discard": "Approximated corners have been discarded and manual extraction is needed!\n" +
+                                  "Select the 4 corners with left clicks and then press any key to continue.\n" +
+                                  "To undo selections in order use right clicks.",
         "calibration_results_unequal": "Plotting error, array lengths of camera calibration results are not the same!"
     }
 
@@ -110,12 +118,14 @@ def load_xml_nodes(directory_path, filename, node_tags, node_types=None):
 
     :param directory_path: directory path
     :param filename: file name
-    :param node_tags: tags for loaded nodes
-    :param node_types: types for loaded nodes ("real", "int", "string", or "mat"), if None or unequal length to
+    :param node_tags: array of tags for loaded nodes
+    :param node_types: array of types for loaded nodes ("real", "int", "string", or "mat"), if None or unequal length to
                        node_tags then just loads nodes
     :return: dictionary of loaded nodes with their tags as keys
     """
-    # Select file
+    # Select file to read from
+    if not filename.lower().endswith(".xml"):
+        filename += ".xml"
     file = cv2.FileStorage(os.path.join(directory_path, filename), cv2.FileStorage_READ)
 
     # No node types given or unequal node tags and types length, just load nodes
@@ -136,7 +146,32 @@ def load_xml_nodes(directory_path, filename, node_tags, node_types=None):
         else:
             nodes[node_tag] = file.getNode(node_tag)
 
+    # Close the file
+    file.release()
+
     return nodes
+
+
+def save_xml_nodes(directory_path, filename, node_tags, node_values):
+    """
+    Save XML file nodes with their tags.
+
+    :param directory_path: directory path
+    :param filename: file name
+    :param node_tags: array of tags for nodes
+    :param node_values: array of values of nodes
+    """
+    # Select file to write to
+    if not filename.lower().endswith(".xml"):
+        filename += ".xml"
+    file = cv2.FileStorage(os.path.join(directory_path, filename), cv2.FileStorage_WRITE)
+
+    # Write every node with its tag
+    for node_tag, node_value in zip(node_tags, node_values):
+        file.write(node_tag, node_value)
+
+    # Close the file
+    file.release()
 
 
 def get_video_frame(directory_path, filename, frame):

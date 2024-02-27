@@ -7,7 +7,7 @@ import utils
 
 
 def train_KNN_background_model(bg_video_input_path="data/cam", bg_video_input_filename="background.avi", use_hsv=True,
-                               history=500, dist_threshold=400.0, detect_shadows=True):
+                               history=500, dist_threshold=400.0, detect_shadows=True, learning_rate=-1):
     """
     Trains a KNN (K-Nearest Neighbors) background model on a video.
 
@@ -18,6 +18,7 @@ def train_KNN_background_model(bg_video_input_path="data/cam", bg_video_input_fi
     :param dist_threshold: threshold on the squared distance between the pixel and the sample to decide whether a pixel
                            is close to that sample
     :param detect_shadows: If true, the background model will detect shadows and mark them as -1
+    :param learning_rate: learning rate for background model to learn background (-1 for automatic)
     :return: returns trained KNN background model
     """
     # Check that video can be loaded
@@ -40,15 +41,15 @@ def train_KNN_background_model(bg_video_input_path="data/cam", bg_video_input_fi
             current_frame = cv2.cvtColor(current_frame, cv2.COLOR_BGR2HSV)
 
         # Apply background subtractor on frame
-        background_model.apply(current_frame)
+        background_model.apply(current_frame, None, learning_rate)
 
     return background_model
 
 
 def train_MOG_background_model(bg_video_input_path="data/cam", bg_video_input_filename="background.avi", use_hsv=True,
-                               history=200, n_mixtures=5, bg_ratio=0.7, noise_sigma=0):
+                               history=200, n_mixtures=5, bg_ratio=0.7, noise_sigma=0, learning_rate=-1):
     """
-    Trains a MOGs (Mixture of Gaussians) background model on a video.
+    Trains a MOG (Mixture of Gaussians) background model on a video.
 
     :param bg_video_input_path: training background video directory path
     :param bg_video_input_filename: training background video file name (including extension)
@@ -58,6 +59,7 @@ def train_MOG_background_model(bg_video_input_path="data/cam", bg_video_input_fi
     :param bg_ratio: specifies the ratio of the number of pixels in the background to the total number of pixels
                      in the image
     :param noise_sigma: specifies the standard deviation of the Gaussian noise added to the pixel intensity distribution
+    :param learning_rate: learning rate for background model to learn background (-1 for automatic)
     :return: returns trained MOG background model
     """
     # Check that video can be loaded
@@ -80,15 +82,15 @@ def train_MOG_background_model(bg_video_input_path="data/cam", bg_video_input_fi
             current_frame = cv2.cvtColor(current_frame, cv2.COLOR_BGR2HSV)
 
         # Apply background subtractor on frame
-        background_model.apply(current_frame)
+        background_model.apply(current_frame, None, learning_rate)
 
     return background_model
 
 
 def train_MOG2_background_model(bg_video_input_path="data/cam", bg_video_input_filename="background.avi", use_hsv=True,
-                                history=500, var_threshold=16, detect_shadows=True):
+                                history=500, var_threshold=16, detect_shadows=True, learning_rate=-1):
     """
-    Trains a MOGs (Mixture of Gaussians Version 2) background model on a video.
+    Trains a MOG2 (Mixture of Gaussians Version 2) background model on a video.
 
     :param bg_video_input_path: training background video directory path
     :param bg_video_input_filename: training background video file name (including extension)
@@ -97,6 +99,7 @@ def train_MOG2_background_model(bg_video_input_path="data/cam", bg_video_input_f
     :param var_threshold: threshold on the squared Mahalanobis distance between the pixel and the model to decide
                           whether a pixel is well described by the background model
     :param detect_shadows: If true, the background model will detect shadows and mark them as -1
+    :param learning_rate: learning rate for background model to learn background (-1 for automatic)
     :return: returns trained MOG2 background model
     """
     # Check that video can be loaded
@@ -119,11 +122,11 @@ def train_MOG2_background_model(bg_video_input_path="data/cam", bg_video_input_f
             current_frame = cv2.cvtColor(current_frame, cv2.COLOR_BGR2HSV)
 
         # Apply background subtractor on frame
-        background_model.apply(current_frame)
+        background_model.apply(current_frame, None, learning_rate)
 
     return background_model
 
-def extract_foreground_mask(bg_model, image, learning_rate=0, figure_threshold=5000, figure_inner_threshold=115,
+def extract_foreground_mask(image, bg_model, learning_rate=0, figure_threshold=5000, figure_inner_threshold=115,
                             apply_opening_pre=False, apply_closing_pre=False, apply_opening_post=False,
                             apply_closing_post=False):
     """
@@ -133,8 +136,8 @@ def extract_foreground_mask(bg_model, image, learning_rate=0, figure_threshold=5
     to bring back lost islands inside the contours. A series of morphological transformations before or after drawing
     the contours with parameters.
 
-    :param bg_model: trained background model
     :param image: BGR image
+    :param bg_model: trained background model
     :param learning_rate: learning rate for trained background model to adapt its training
     :param figure_threshold: contour will be drawn in white if its area is larger than this threshold
     :param figure_inner_threshold: inner contour child of a contour passing figure_threshold will be drawn in black if
@@ -207,7 +210,7 @@ def extract_foreground_mask(bg_model, image, learning_rate=0, figure_threshold=5
 
 def subtract_background_from_video(bg_model, video_input_path="data/cam", video_input_filename="video.avi",
                                    frame_interval=50, stop_frame=50, result_time_visible=1000,
-                                   output_frame=True, output_frame_filename="mask.jpg", learning_rate=0,
+                                   output_frame=False, output_frame_filename="mask.jpg", learning_rate=0,
                                    figure_threshold=5000, figure_inner_threshold=115,
                                    apply_opening_pre=False, apply_closing_pre=False, apply_opening_post=False,
                                    apply_closing_post=False):
@@ -223,7 +226,7 @@ def subtract_background_from_video(bg_model, video_input_path="data/cam", video_
                                 for key press, -1 to not show result to screen
     :param output_frame: if True then outputs the first processed frame with the subtracted background and extracted
                          foreground mask in the same path as video_input_path
-    :param output_frame_filename: output frame file name (including extension) for when output_frame is True
+    :param output_frame_filename: output frame file name (including extension), used when output_frame is True
     :param learning_rate: learning rate for trained background model to adapt its training
     :param figure_threshold: contour will be drawn in white if its area is larger than this threshold
     :param figure_inner_threshold: inner contour child of a contour passing figure_threshold will be drawn in black if
@@ -259,8 +262,7 @@ def subtract_background_from_video(bg_model, video_input_path="data/cam", video_
         # Check if frame will be used according to interval
         if frame_count % frame_interval == 0:
             # Extract foreground
-            #foreground = compute_foreground_masks(current_frame, bg_model, 80)
-            foreground = extract_foreground_mask(bg_model, current_frame,
+            foreground = extract_foreground_mask(current_frame, bg_model,
                                                  learning_rate=learning_rate, figure_threshold=figure_threshold,
                                                  figure_inner_threshold=figure_inner_threshold,
                                                  apply_opening_pre=apply_opening_pre,

@@ -50,7 +50,7 @@ def project_3D_points_to_2D(chunk, camera_data):
     rotation_vector, translation_vector = camera_data['RotationMatrix'], camera_data['TranslationMatrix']
     camera_matrix, distortion_coeffs = camera_data['CameraMatrix'], camera_data['DistortionCoeffs']
 
-    # Convert rotation matrix to rotation vector if necessary
+    # Convert rotation matrix to rotation vector
     rotation_vector, _ = cv2.Rodrigues(rotation_vector) if rotation_vector.shape == (3, 3) else (rotation_vector, None)
 
     # Project the 3D points
@@ -101,7 +101,7 @@ def refine_lookup_table(lookup_table):
             
             # Check if pixel coordinates are within the mask dimensions
             if x >= 0 and x < mask_width and y >= 0 and y < mask_height:
-                if mask[y, x] == 255:  # Check if pixel is part of the object
+                if mask[y, x] == 255:  
                     refined_lookup[camera_index][pixel] = world_points
                 
     total_mappings = 0
@@ -110,7 +110,9 @@ def refine_lookup_table(lookup_table):
     return refined_lookup, total_mappings
 
 # Step 7: Save the Lookup Table
-# [Add your code here to serialize and save the lookup table]
+def save_lookup_table(lookup_table, name):
+    with open(name, 'wb') as f:
+        pickle.dump(lookup_table, f)
 
 
 # Step 1: Define 3D Space
@@ -135,15 +137,14 @@ if __name__ == '__main__':
     ############################ CREATE LOOKUP TABLE ############################
     lookup_table, total_mappings = create_lookup_table(chunks, cameras_data)
     print(f"## Lookup table was created. Total mappings: {total_mappings} ##")
-    with open('lookup_table.pkl', 'wb') as f:
-        pickle.dump(lookup_table, f)
     
     ############################ REFINE LOOKUP TABLE ############################
     refined_lookup_table, total_mappings = refine_lookup_table(lookup_table)
     print(f"## Lookup table was refined. Total mappings: {total_mappings} ##")
-    with open('refined_lookup_table.pkl', 'wb') as f:
-        pickle.dump(refined_lookup_table, f)
     
+    ############################ SAVE LOOKUP TABLES ############################
+    save_lookup_table(lookup_table, 'lookup_table.pkl')
+    save_lookup_table(refined_lookup_table, 'refined_lookup_table.pkl')
     print("*** Both the original and refined lookup tables are saved ***")
     
     exit(0)

@@ -12,21 +12,21 @@ approx_corners = []
 images_temp = []
 
 
-def load_chessboard_info(xml_input_path="data", xml_input_filename="checkerboard.xml"):
+def load_chessboard_info(chessboard_input_path="data", chessboard_input_filename="checkerboard.xml"):
     """
     Loads chessboard shape and square size from XML file.
 
-    :param xml_input_path: chessboard xml file directory path
-    :param xml_input_filename: chessboard xml file name
-    :return: chessboard number of intersection points horizontally and vertically (horizontal, vertical), chessboard
-             square size in mm
+    :param chessboard_input_path: chessboard xml file directory path
+    :param chessboard_input_filename: chessboard xml file name
+    :return: returns chessboard number of intersection points horizontally and vertically (horizontal, vertical),
+             chessboard square size in mm
     """
     # Select tags for loaded nodes and their types
     node_tags = ["CheckerBoardWidth", "CheckerBoardHeight", "CheckerBoardSquareSize"]
     node_types = ["int" for _ in range(len(node_tags))]
 
     # Load nodes
-    nodes = utils.load_xml_nodes(xml_input_path, xml_input_filename, node_tags, node_types)
+    nodes = utils.load_xml_nodes(chessboard_input_path, chessboard_input_filename, node_tags, node_types)
 
     # Format outputs into shape and square size
     chessboard_shape = (nodes.get("CheckerBoardWidth"), nodes.get("CheckerBoardHeight"))
@@ -970,7 +970,7 @@ if __name__ == '__main__':
 
         # Output intrinsics and extrinsics to config file
         utils.save_xml_nodes(cam_paths[camera-1], "config.xml",
-                             ["CameraMatrix", "DistortionCoeffs", "RotationMatrix", "TranslationMatrix"],
+                             ["CameraMatrix", "DistortionCoeffs", "RotationVector", "TranslationVector"],
                              [mtx, dist, rvecs, tvecs])
 
     # Plot intrinsic calibration results from all cameras

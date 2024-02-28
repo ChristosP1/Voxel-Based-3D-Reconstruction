@@ -172,51 +172,6 @@ def save_xml_nodes(directory_path, filename, node_tags, node_values):
 
     # Close the file
     file.release()
-    
-def load_camera_xml(path, scaling_factor=1.0):
-    """
-    This function loads all the camera data contained in config.xml
-    :param path: The path pointing to the camera's config.xml file
-    :return: The camera data stored in a dictionary
-    """
-    camera = {}
-    file = cv2.FileStorage(path, cv2.FileStorage_READ)
-
-    camera["CameraMatrix"] = file.getNode("CameraMatrix").mat()
-    camera["DistortionCoeffs"] = file.getNode("DistortionCoeffs").mat()
-    camera["RotationMatrix"] = file.getNode("RotationMatrix").mat()
-    camera["TranslationMatrix"] = file.getNode("TranslationMatrix").mat()
-    
-    # Compute the rescaled world position
-    rot_mat, _ = cv2.Rodrigues(camera["RotationMatrix"])
-    camera_position = -np.matrix(rot_mat).T * np.matrix(camera["TranslationMatrix"])
-    camera["RescaledWorldPosition"] = np.array([camera_position[0][0], camera_position[1][0], camera_position[2][0]]) * scaling_factor
-
-    file.release()
-
-    return camera
-
-def load_cameras_xml(paths, scaling_factor=1.0):
-    """
-    This function loads all the cameras from the provided config.xml paths
-    :param paths: A list of paths to the config.xml files for each camera
-    :return: A list of dictionaries containing camera data
-    """
-    cameras = []
-    for path in paths:
-        cameras.append(load_camera_xml(path, scaling_factor))
-    return cameras
-
-def find_file_paths(directory, filename):
-    found_files = []
-
-    for folder_path, subfolders, filenames in os.walk(directory):
-        for file in filenames:
-            if file == filename:
-                full_path = os.path.join(folder_path, file)
-                found_files.append(full_path)
-
-    return found_files
 
 
 def get_video_frame(directory_path, filename, frame):
